@@ -1,0 +1,39 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signed() { return request.auth != null; }
+    function isAdmin() {
+      return signed() &&
+        get(/databases/$(database)/documents/usuarios_sistema/$(request.auth.uid)).data.rol == "admin";
+    }
+
+    match /usuarios_sistema/{uid} {
+      allow read: if signed() && (request.auth.uid == uid || isAdmin());
+      allow create: if signed() && request.auth.uid == uid
+        && request.resource.data.rol == "operador";
+      allow update, delete: if isAdmin();
+    }
+
+    match /grados/{id}      { allow read: if signed(); allow write: if isAdmin(); }
+    match /estudiantes/{id} { allow read: if signed(); allow write: if isAdmin(); }
+
+    match /registros_reciclaje/{id} {
+      allow read: if isAdmin() ||
+        (signed() && resource.data.id_operador == request.auth.uid);
+      allow create: if signed()
+        && request.resource.data.id_operador == request.auth.uid
+        && request.resource.data.kilos is number
+        && request.resource.data.kilos > 0
+        && request.resource.data.kilos <= 5000;
+      allow update, delete: if isAdmin() ||
+        (signed() && resource.data.id_operador == request.auth.uid);
+    }
+
+    match /estadisticas/{id} {
+      allow read: if signed();
+      allow write: if signed();
+    }
+
+    match /cierres_anio/{id} { allow read, write: if isAdmin(); }
+  }
+}
