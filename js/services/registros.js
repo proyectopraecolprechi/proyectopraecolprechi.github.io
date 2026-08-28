@@ -108,3 +108,50 @@ export async function ultimosDelOperador(operadorId, max = 20) {
   const snap = await getDocs(q);
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
+
+
+
+
+export async function eliminarRegistroYPropagar(registroId, kilos, gradoNombre, estudianteId, fechaDate) {
+  const batch = writeBatch(db);
+
+  // 1. Eliminar el documento del registro original
+  batch.delete(doc(db, "registros", registroId));
+
+  // 2. Extraer año y mes para restar en las estadísticas correspondientes
+  const anio = fechaDate.getFullYear();
+  const mes = fechaDate.getMonth() + 1;
+  
+  // Construir los sufijos según tu estadisticas.js
+  const sufijoMes = `${anio}_${String(mes).padStart(2, "0")}`;
+  const sufijoAnio = `${anio}`;
+
+  // Helper para restar en un documento de estadísticas
+  const restarStats = (docRef) => {
+    batch.set(docRef, {
+      total_kilos: increment(-kilos),
+      total_registros: increment(-1)
+    }, { merge: true });
+  };
+
+  // Restar global
+  restarStats(doc(db, "estadisticas", `global_total`));
+  restarStats(doc(db, "estadisticas", `global_${sufijoAnio}`));
+  restarStats(doc(db, "estadisticas", `global_${sufijoMes}`));
+
+  // Restar por Grado
+  if (gradoNombre) {
+    restarStats(doc(db, "estadisticas", `grado_${gradoNombre}_total`));
+    restarStats(doc(db, "estadisticas", `grado_${gradoNombre}_${sufijoAnio}`));
+    restarStats(doc(db, "estadisticas", `grado_${gradoNombre}_${sufijoMes}`));
+  }
+
+  // Restar por Estudiante
+  if (estudianteId) {
+    restarStats(doc(db, "estadisticas", `estudiante_${estudianteId}_total`));
+    restarStats(doc(db, "estadisticas", `estudiante_${estudianteId}_${sufijoAnio}`));
+  }
+
+  // Ejecutar toda la operación al mismo tiempo
+  await batch.commit();
+}

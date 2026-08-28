@@ -40,3 +40,22 @@ export async function updateEstudiante(id, patch) {
 export async function setEstado(id, estado) {
   await updateDoc(doc(db, COL, id), { estado });
 }
+
+
+
+
+import {
+  deleteDoc
+} from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+
+
+
+// ... (Tus funciones existentes: listByGrado, listAll, getEstudiante, createEstudiante, updateDoc)
+
+/**
+ * Elimina definitivamente un documento de estudiante de la colección en Firestore
+ * @param {string} id - UID del documento del estudiante
+ */
+export async function deleteEstudianteFisico(id) {
+  await deleteDoc(doc(db, COL, id));
+}

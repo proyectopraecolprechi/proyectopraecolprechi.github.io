@@ -21,6 +21,7 @@ export function renderShell(viewBody) {
     { to: "/admin/grados", label: "Grados", icon: "graduation-cap" },
     { to: "/admin/reportes", label: "Reportes", icon: "line-chart" },
     { to: "/admin/cierre", label: "Cierre de año", icon: "calendar-check" },
+    { to: "/admin/operadores", label: "Operadores", icon: "users" },
   ];
 
   const isActive = (to) => path === to || path.startsWith(to + "/");
@@ -28,6 +29,11 @@ export function renderShell(viewBody) {
   const shell = el(`<div class="app-shell ${admin ? "has-sidebar" : ""}"></div>`);
 
   if (admin) {
+    // Fondo oscuro al abrir el menú en móviles
+    const overlay = el(`<div class="sidebar-overlay"></div>`);
+    overlay.addEventListener("click", () => shell.classList.remove("sidebar-open"));
+    shell.appendChild(overlay);
+
     const side = el(`
       <aside class="sidebar">
         <div class="brand"><i data-lucide="leaf"></i> PRAE</div>
@@ -37,6 +43,12 @@ export function renderShell(viewBody) {
         <a href="#" class="logout" data-action="logout"><i data-lucide="log-out"></i> Cerrar sesión</a>
       </aside>
     `);
+    
+    // Cerrar menú al hacer clic en un enlace (móviles)
+    side.querySelectorAll('nav a').forEach(a => {
+      a.addEventListener('click', () => shell.classList.remove('sidebar-open'));
+    });
+    
     side.querySelector('[data-action="logout"]').addEventListener("click", (e) => { e.preventDefault(); logout(); });
     shell.appendChild(side);
   }
@@ -45,14 +57,25 @@ export function renderShell(viewBody) {
 
   const top = el(`
     <header class="topbar">
-      <div class="brand"><i data-lucide="leaf"></i> PRAE Reciclaje</div>
+      <div class="brand">
+        ${admin ? `<button class="menu-btn" style="margin-right:8px;"><i data-lucide="menu"></i></button>` : ""}
+        <i data-lucide="leaf"></i> PRAE Reciclaje
+      </div>
       <div class="user">
         <span class="badge ${admin ? "admin" : "activo"}">${admin ? "Admin" : "Operador"}</span>
-        <span>${user?.nombre || user?.email || ""}</span>
+        <span class="hide-mobile">${user?.nombre || user?.email || ""}</span>
         <button data-action="logout" title="Cerrar sesión"><i data-lucide="log-out"></i></button>
       </div>
     </header>
   `);
+  
+  // Abrir menú lateral
+  if (admin) {
+    top.querySelector('.menu-btn').addEventListener("click", () => {
+      shell.classList.add("sidebar-open");
+    });
+  }
+
   top.querySelector('[data-action="logout"]').addEventListener("click", () => logout());
   main.appendChild(top);
 
@@ -60,6 +83,7 @@ export function renderShell(viewBody) {
   mainEl.appendChild(viewBody);
   main.appendChild(mainEl);
 
+  // Menú inferior para operadores
   if (!admin) {
     const nav = el(`
       <nav class="bottom-nav">

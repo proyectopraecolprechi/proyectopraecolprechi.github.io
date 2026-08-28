@@ -1,7 +1,7 @@
-import { el, $, escapeHtml, refreshIcons, toast, loading, empty, debounce } from "../ui.js";
+import { el, $, escapeHtml, refreshIcons, toast, loading, empty, debounce, confirmModal } from "../ui.js";
 import { renderShell } from "./shell.js";
 import { listGrados } from "../services/grados.js";
-import { listAll, createEstudiante, updateEstudiante, setEstado } from "../services/estudiantes.js";
+import { listAll, createEstudiante, updateEstudiante, setEstado, deleteEstudianteFisico } from "../services/estudiantes.js";
 
 export async function renderAdminEstudiantes({ mount }) {
   const body = el(`
@@ -61,6 +61,8 @@ export async function renderAdminEstudiantes({ mount }) {
 
     const $t = $("#tabla", body);
     if (!filtered.length) { empty($t, "Sin estudiantes."); return; }
+    
+    // Se añade el botón de eliminar (trash) en la celda de acciones
     $t.innerHTML = `
       <div class="table-wrap">
         <table class="data">
@@ -75,8 +77,9 @@ export async function renderAdminEstudiantes({ mount }) {
                 <td><span class="badge ${e.estado}">${escapeHtml(e.estado||"")}</span></td>
                 <td class="row">
                   <a class="btn btn-ghost" href="#/estudiante/${e.id}" title="Ver historial"><i data-lucide="history"></i></a>
-                  <button class="btn btn-ghost" data-act="edit" data-id="${e.id}"><i data-lucide="pencil"></i></button>
+                  <button class="btn btn-ghost" data-act="edit" data-id="${e.id}" title="Editar"><i data-lucide="pencil"></i></button>
                   <button class="btn btn-ghost" data-act="toggle" data-id="${e.id}">${e.estado==="activo"?"Inactivar":"Activar"}</button>
+                  <button class="btn btn-ghost btn-danger" data-act="delete" data-id="${e.id}" title="Eliminar"><i data-lucide="trash"></i></button>
                 </td>
               </tr>
             `).join("")}
@@ -85,13 +88,34 @@ export async function renderAdminEstudiantes({ mount }) {
       </div>
     `;
     refreshIcons();
-    $t.querySelectorAll("button[data-act]").forEach(btn => btn.addEventListener("click", () => {
+    
+    // Lógica unificada para manejar los clicks de todos los botones de la tabla
+    $t.querySelectorAll("button[data-act]").forEach(btn => btn.addEventListener("click", async () => {
       const e = estudiantes.find(x => x.id === btn.dataset.id);
       if (!e) return;
+
       if (btn.dataset.act === "toggle") {
         setEstado(e.id, e.estado === "activo" ? "inactivo" : "activo").then(reload);
       } else if (btn.dataset.act === "edit") {
         openForm(e);
+      } else if (btn.dataset.act === "delete") {
+        // Implementación del flujo de eliminación con modal de confirmación
+        const seguro = await confirmModal({
+          title: "Eliminar estudiante",
+          body: `¿Eliminar definitivamente a ${escapeHtml(e.nombres)} ${escapeHtml(e.apellidos)}? Esta acción no se puede deshacer.`,
+          danger: true,
+          confirmText: "Sí, eliminar"
+        });
+
+        if (seguro) {
+          try {
+            await deleteEstudianteFisico(e.id);
+            toast("Estudiante eliminado permanentemente", { type: "success" });
+            reload();
+          } catch (err) {
+            toast("Error al eliminar estudiante: " + err.message, { type: "error" });
+          }
+        }
       }
     }));
   }
