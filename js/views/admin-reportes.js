@@ -59,10 +59,17 @@ export async function renderAdminReportes({ mount }) {
     lastTop = await topEstudiantes({ anio, max: 50 });
     $("#top", body).innerHTML = `<div class="rank-list">` + lastTop.map((r,i)=>{
       const e = estById[r.estudianteId];
-      return `<div class="rank-item ${i<3?"top-"+(i+1):""}"><div class="pos">${i+1}</div><div class="name">
-        <a href="#/estudiante/${r.estudianteId}">${e ? escapeHtml(`${e.apellidos||""} ${e.nombres||""}`) : r.estudianteId}</a>
-        <div class="small muted">${e?.grado_actual_nombre || ""}</div>
-      </div><div class="kg">${formatKg(r.total_kilos)}</div></div>`;
+      // Si el estudiante fue eliminado, estById no lo encontrará, evitamos imprimir el ID.
+      const nombreEst = e ? escapeHtml(`${e.apellidos||""} ${e.nombres||""}`) : "[Estudiante Eliminado]";
+      
+      return `<div class="rank-item ${i<3?"top-"+(i+1):""}">
+        <div class="pos">${i+1}</div>
+        <div class="name">
+          <a href="#/estudiante/${r.estudianteId}">${nombreEst}</a>
+          <div class="small muted">${e?.grado_actual_nombre || ""}</div>
+        </div>
+        <div class="kg">${formatKg(r.total_kilos)}</div>
+      </div>`;
     }).join("") + `</div>`;
   }
 
@@ -71,10 +78,14 @@ export async function renderAdminReportes({ mount }) {
   $("#csv", body).addEventListener("click", () => {
     const rows = [["Tipo","Posición","Nombre","Kilos","Registros"]];
     lastRanking.forEach((r,i) => rows.push(["Grado", i+1, r.grado, r.total_kilos, r.total_registros]));
+    
     lastTop.forEach((r,i) => {
       const e = estById[r.estudianteId];
-      rows.push(["Estudiante", i+1, e ? `${e.apellidos||""} ${e.nombres||""}` : r.estudianteId, r.total_kilos, r.total_registros]);
+      // Misma lógica de prevención para el CSV
+      const nombreEst = e ? `${e.apellidos||""} ${e.nombres||""}` : "[Estudiante Eliminado]";
+      rows.push(["Estudiante", i+1, nombreEst, r.total_kilos, r.total_registros]);
     });
+    
     const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const a = document.createElement("a");

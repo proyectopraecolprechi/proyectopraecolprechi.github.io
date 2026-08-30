@@ -2,6 +2,9 @@ import { el, $, escapeHtml, refreshIcons, toast, loading, empty, debounce, confi
 import { renderShell } from "./shell.js";
 import { listGrados } from "../services/grados.js";
 import { listAll, createEstudiante, updateEstudiante, setEstado, deleteEstudianteFisico } from "../services/estudiantes.js";
+import { db } from "../firebase-config.js";
+import { collection, query, where, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+import { deleteRegistro } from "../services/registros.js"; // IMPORTANTE: Agregado para actualizar estadísticas
 
 export async function renderAdminEstudiantes({ mount }) {
   const body = el(`
@@ -62,7 +65,6 @@ export async function renderAdminEstudiantes({ mount }) {
     const $t = $("#tabla", body);
     if (!filtered.length) { empty($t, "Sin estudiantes."); return; }
     
-    // Se añade el botón de eliminar (trash) en la celda de acciones
     $t.innerHTML = `
       <div class="table-wrap">
         <table class="data">
@@ -89,7 +91,6 @@ export async function renderAdminEstudiantes({ mount }) {
     `;
     refreshIcons();
     
-    // Lógica unificada para manejar los clicks de todos los botones de la tabla
     $t.querySelectorAll("button[data-act]").forEach(btn => btn.addEventListener("click", async () => {
       const e = estudiantes.find(x => x.id === btn.dataset.id);
       if (!e) return;
@@ -99,21 +100,47 @@ export async function renderAdminEstudiantes({ mount }) {
       } else if (btn.dataset.act === "edit") {
         openForm(e);
       } else if (btn.dataset.act === "delete") {
-        // Implementación del flujo de eliminación con modal de confirmación
         const seguro = await confirmModal({
           title: "Eliminar estudiante",
-          body: `¿Eliminar definitivamente a ${escapeHtml(e.nombres)} ${escapeHtml(e.apellidos)}? Esta acción no se puede deshacer.`,
+          body: `¿Eliminar definitivamente a ${escapeHtml(e.nombres)} ${escapeHtml(e.apellidos)} y TODOS sus registros de peso? Esta acción restará sus kilos de las estadísticas globales y no se puede deshacer.`,
           danger: true,
-          confirmText: "Sí, eliminar"
+          confirmText: "Sí, eliminar todo"
         });
 
         if (seguro) {
           try {
+            loading($("#tabla", body));
+            
+            // 1. Buscar y ELIMINAR los registros del estudiante (usando deleteRegistro para propagar las estadísticas)
+            const qDocs = query(collection(db, "registros_reciclaje"), where("id_estudiante", "==", e.id));
+            const snap = await getDocs(qDocs);
+            
+            if (!snap.empty) {
+              for (const docSnap of snap.docs) {
+                await deleteRegistro(docSnap.id);
+              }
+            }
+
+            // Eliminar de colección antigua por seguridad (sin afectar estadísticas)
+            const qDocsAntiguos = query(collection(db, "registros"), where("id_estudiante", "==", e.id));
+            const snapAntiguos = await getDocs(qDocsAntiguos);
+            if (!snapAntiguos.empty) {
+              const batchAntiguos = writeBatch(db);
+              snapAntiguos.forEach(docSnap => {
+                batchAntiguos.delete(docSnap.ref);
+              });
+              await batchAntiguos.commit();
+            }
+
+            // 2. Eliminar al estudiante físicamente
             await deleteEstudianteFisico(e.id);
-            toast("Estudiante eliminado permanentemente", { type: "success" });
-            reload();
+            
+            toast("Estudiante y todos sus aportes eliminados.", { type: "success" });
           } catch (err) {
-            toast("Error al eliminar estudiante: " + err.message, { type: "error" });
+            console.error(err);
+            toast("Error al eliminar: " + err.message, { type: "error" });
+          } finally {
+            reload();
           }
         }
       }

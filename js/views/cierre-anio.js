@@ -63,8 +63,8 @@ export async function renderCierreAnio({ mount }) {
                       <option value="promover" ${d.action==="promover"?"selected":""}>Promover</option>
                       <option value="repetir" ${d.action==="repetir"?"selected":""}>Repetir</option>
                       <option value="retirar" ${d.action==="retirar"?"selected":""}>Retirar</option>
-                      <option value="egresar" ${d.action==="egresar"?"selected":""}>Egresar</option>
-                      <option value="manual" ${d.action==="manual"?"selected":""}>Asignar manual</option>
+                      <!-- <option value="egresar" ${d.action==="egresar"?"selected":""}>Egresar</option> -->
+                      <!-- <option value="manual" ${d.action==="manual"?"selected":""}>Asignar manual</option> -->
                     </select>
                   </td>
                   <td>

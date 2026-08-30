@@ -1,8 +1,8 @@
-import { el, $, toast, refreshIcons, escapeHtml, formatKg, formatDateTime, loading, empty, debounce } from "../ui.js";
+import { el, $, toast, refreshIcons, escapeHtml, formatKg, formatDateTime, empty } from "../ui.js";
 import { getCurrentUser } from "../auth.js";
 import { listGrados } from "../services/grados.js";
-import { listByGrado } from "../services/estudiantes.js";
-import { createRegistro, deleteRegistro, ultimosDelOperador } from "../services/registros.js";
+import { listByGrado, listAll as listAllEstudiantes } from "../services/estudiantes.js";
+import { createRegistro, ultimosDelOperador, deleteRegistro } from "../services/registros.js";
 import { renderShell } from "./shell.js";
 
 export async function renderRegistro({ mount }) {
@@ -29,12 +29,12 @@ export async function renderRegistro({ mount }) {
         </div>
 
         <div id="estudiantes-block" style="display:none;">
-          <div class="field search-box">
-            <label for="buscar">Estudiante</label>
-            <i data-lucide="search"></i>
-            <input id="buscar" type="text" placeholder="Buscar por nombre o apellido" autocomplete="off">
+          <div class="field">
+            <label for="estudiante">Estudiante</label>
+            <select id="estudiante">
+              <option value="">Selecciona un grado primero...</option>
+            </select>
           </div>
-          <div id="estudiantes-list" class="list-pick"></div>
         </div>
 
         <div class="field">
@@ -63,16 +63,24 @@ export async function renderRegistro({ mount }) {
     gradoSel: null,
     estudiantes: [],
     estudianteSel: null,
-    busqueda: "",
+    todosEstudiantesMap: {}
   };
+
+  try {
+    const allEst = await listAllEstudiantes();
+    state.todosEstudiantesMap = Object.fromEntries(allEst.map(e => [e.id, `${e.apellidos || ""} ${e.nombres || ""}`.trim()]));
+  } catch (e) {
+    console.warn("No se pudo cargar la lista global de estudiantes.");
+  }
 
   const $grado = $("#grado", body);
   const $externos = $("#externos-fields", body);
   const $estBlock = $("#estudiantes-block", body);
-  const $list = $("#estudiantes-list", body);
-  const $buscar = $("#buscar", body);
+  const $estudiante = $("#estudiante", body);
   const $kilos = $("#kilos", body);
   const $btn = $("#guardar", body);
+  const $ultimos = $("#ultimos", body);
+  let hideExpiredInterval; 
 
   state.grados = await listGrados({ soloActivos: true });
   $grado.innerHTML = `<option value="">Selecciona un grado…</option>` +
@@ -89,14 +97,24 @@ export async function renderRegistro({ mount }) {
     state.gradoSel = state.grados.find(g => g.id === id) || null;
     state.estudianteSel = null;
     state.estudiantes = [];
-    if (!state.gradoSel) { $externos.style.display = "none"; $estBlock.style.display = "none"; recompute(); return; }
+    
+    if (!state.gradoSel) { 
+      $externos.style.display = "none"; 
+      $estBlock.style.display = "none"; 
+      recompute(); 
+      return; 
+    }
+    
     if (state.gradoSel.es_virtual) {
       $externos.style.display = "block";
       $estBlock.style.display = "none";
     } else {
       $externos.style.display = "none";
       $estBlock.style.display = "block";
-      loading($list);
+      
+      $estudiante.innerHTML = `<option value="">Cargando estudiantes...</option>`;
+      $estudiante.disabled = true;
+      
       state.estudiantes = await listByGrado(state.gradoSel.id);
       renderEstudiantes();
     }
@@ -104,25 +122,25 @@ export async function renderRegistro({ mount }) {
   });
 
   function renderEstudiantes() {
-    const q = state.busqueda.toLowerCase().trim();
-    const filtered = state.estudiantes.filter(e =>
-      !q || `${e.nombres} ${e.apellidos}`.toLowerCase().includes(q)
-    );
-    if (!filtered.length) { empty($list, "Sin estudiantes."); return; }
-    $list.innerHTML = filtered.map(e => `
-      <button type="button" data-id="${e.id}" class="${state.estudianteSel?.id === e.id ? "selected" : ""}">
-        <span>${escapeHtml(e.apellidos || "")} ${escapeHtml(e.nombres || "")}</span>
-      </button>
-    `).join("");
-    $list.querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
-      const est = state.estudiantes.find(x => x.id === b.dataset.id);
-      state.estudianteSel = est;
-      renderEstudiantes();
-      recompute();
-    }));
+    $estudiante.disabled = false;
+    
+    if (!state.estudiantes.length) { 
+      $estudiante.innerHTML = `<option value="">Sin estudiantes en este grado</option>`;
+      return; 
+    }
+    
+    $estudiante.innerHTML = `<option value="">Seleccionar estudiante</option>` + 
+      state.estudiantes.map(e => `
+        <option value="${e.id}">${escapeHtml(e.apellidos || "")} ${escapeHtml(e.nombres || "")}</option>
+      `).join("");
   }
 
-  $buscar.addEventListener("input", debounce(() => { state.busqueda = $buscar.value; renderEstudiantes(); }, 150));
+  $estudiante.addEventListener("change", () => {
+    const id = $estudiante.value;
+    state.estudianteSel = state.estudiantes.find(x => x.id === id) || null;
+    recompute();
+  });
+
   $kilos.addEventListener("input", recompute);
   body.addEventListener("input", (e) => { if (e.target.id === "donante") recompute(); });
 
@@ -133,8 +151,11 @@ export async function renderRegistro({ mount }) {
     $btn.innerHTML = "Guardando…";
     try {
       const externo = state.gradoSel.es_virtual;
+      const estNombre = state.estudianteSel ? `${state.estudianteSel.apellidos || ""} ${state.estudianteSel.nombres || ""}`.trim() : null;
+
       const reg = await createRegistro({
         id_estudiante: externo ? null : state.estudianteSel.id,
+        estudiante_nombre: estNombre,
         grado_snapshot: externo ? "Externos" : state.gradoSel.nombre,
         kilos: Number($kilos.value),
         id_operador: user.uid,
@@ -145,16 +166,21 @@ export async function renderRegistro({ mount }) {
       });
       toast(`Registrado ${formatKg(reg.kilos)}`, {
         type: "success",
-        duration: 8000,
-        action: { label: "Deshacer", onClick: async () => {
-          try { await deleteRegistro(reg.id); toast("Registro eliminado.", { type: "info" }); renderUltimos(); }
-          catch (e) { toast("No se pudo deshacer.", { type: "error" }); }
-        } },
+        duration: 8000
       });
-      // reset
+      
+      if (!externo && state.estudianteSel) {
+        state.todosEstudiantesMap[state.estudianteSel.id] = estNombre;
+      }
+
       $kilos.value = "";
-      if (externo) { $("#donante", body).value = ""; $("#descripcion", body).value = ""; }
-      else { state.estudianteSel = null; renderEstudiantes(); }
+      if (externo) { 
+        $("#donante", body).value = ""; 
+        $("#descripcion", body).value = ""; 
+      } else { 
+        state.estudianteSel = null; 
+        $estudiante.value = ""; 
+      }
       renderUltimos();
     } catch (e) {
       console.error(e);
@@ -166,20 +192,68 @@ export async function renderRegistro({ mount }) {
     }
   });
 
-  const $ultimos = $("#ultimos", body);
   async function renderUltimos() {
     try {
       const items = await ultimosDelOperador(user.uid, 10);
       if (!items.length) { empty($ultimos, "Aún no has registrado pesajes."); return; }
-      $ultimos.innerHTML = `<div class="timeline">` + items.map(r => `
-        <div class="entry">
+      
+      const now = Date.now();
+      
+      $ultimos.innerHTML = `<div class="timeline">` + items.map(r => {
+        const nombreEstudiante = state.todosEstudiantesMap[r.id_estudiante] || r.estudiante_nombre || r.grado_snapshot;
+        const titulo = r.es_externo ? "Externo: " + escapeHtml(r.donante_nombre || "—") : escapeHtml(nombreEstudiante);
+
+        // Convertimos el timestamp de Firebase a milisegundos reales
+        const ms = r.fecha_hora?.toMillis ? r.fecha_hora.toMillis() : new Date(r.fecha_hora).getTime();
+        const isDeletable = (now - ms) <= 60000; // <= 1 minuto
+
+        return `
+        <div class="entry" style="display:flex; justify-content:space-between; align-items:center;">
           <div>
-            <div><strong>${r.es_externo ? "Externo: " + escapeHtml(r.donante_nombre || "—") : escapeHtml(r.grado_snapshot)}</strong></div>
+            <div><strong>${titulo} - ${escapeHtml(r.grado_snapshot)}</strong></div>
             <div class="meta">${formatDateTime(r.fecha_hora)}</div>
           </div>
-          <div class="kg">${formatKg(r.kilos)}</div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <div class="kg">${formatKg(r.kilos)}</div>
+            ${isDeletable ? `<button class="btn btn-ghost btn-danger btn-sm btn-delete-reg" data-id="${r.id}" data-ts="${ms}" style="padding:4px;"><i data-lucide="trash"></i></button>` : ''}
+          </div>
         </div>
-      `).join("") + `</div>`;
+      `}).join("") + `</div>`;
+      
+      refreshIcons();
+      
+      // Asignar el evento de eliminación a los botones
+      $ultimos.querySelectorAll('.btn-delete-reg').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            const id = e.currentTarget.dataset.id;
+            if (confirm("¿Estás seguro de que quieres eliminar este registro? Los kilos se restarán.")) {
+                try {
+                    await deleteRegistro(id);
+                    toast("Registro eliminado exitosamente.", { type: "info" });
+                    renderUltimos();
+                } catch(err) {
+                    toast("Error al eliminar: " + err.message, { type: "error" });
+                }
+            }
+        });
+      });
+
+      // Crear un bucle invisible para que los botones desaparezcan automáticamente pasado el minuto
+      if (hideExpiredInterval) clearInterval(hideExpiredInterval);
+      hideExpiredInterval = setInterval(() => {
+          if (!document.body.contains($ultimos)) {
+              clearInterval(hideExpiredInterval);
+              return;
+          }
+          const currentTime = Date.now();
+          $ultimos.querySelectorAll('.btn-delete-reg').forEach(btn => {
+              const ts = parseInt(btn.dataset.ts, 10);
+              if ((currentTime - ts) > 60000) {
+                  btn.remove(); // El botón desaparece
+              }
+          });
+      }, 5000); // Revisa la edad de los botones cada 5 segundos
+
     } catch (e) {
       empty($ultimos, "No se pudo cargar el historial.");
     }

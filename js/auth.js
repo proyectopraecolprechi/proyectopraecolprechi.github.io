@@ -1,12 +1,7 @@
-import { auth, db, isConfigured } from "./firebase-config.js";
-import {
-  signInWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged,
-} from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
-import { doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+import { db, isConfigured } from "./firebase-config.js";
+import { collection, query, where, getDocs, doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
 
-let currentUser = null;        // { uid, email, nombre, rol }
+let currentUser = null;
 const listeners = new Set();
 
 export function getCurrentUser() { return currentUser; }
@@ -19,51 +14,76 @@ export function onUserChange(cb) {
   return () => listeners.delete(cb);
 }
 
-function emit() { listeners.forEach(cb => cb(currentUser)); }
+function emit() {
+  if (currentUser) {
+    localStorage.setItem("prae_user", JSON.stringify(currentUser));
+  } else {
+    localStorage.removeItem("prae_user");
+  }
+  listeners.forEach(cb => cb(currentUser));
+}
 
 export async function login(email, password) {
   if (!isConfigured) throw new Error("Firebase no está configurado. Edita js/firebase-config.js.");
-  const cred = await signInWithEmailAndPassword(auth, email, password);
-  return cred.user;
+  
+  const q = query(collection(db, "usuarios_sistema"), where("email", "==", email.toLowerCase().trim()));
+  const snap = await getDocs(q);
+  
+  if (snap.empty) throw new Error("El usuario no existe.");
+  
+  let foundUser = null;
+  let foundId = null;
+  snap.forEach(d => { foundUser = d.data(); foundId = d.id; });
+  
+  if (foundUser.password !== password) {
+    throw new Error("Contraseña incorrecta.");
+  }
+  
+  currentUser = { uid: foundId, ...foundUser };
+  emit();
+  return currentUser;
+}
+
+export async function registrarUsuario(email, password, nombre) {
+  const correoLimpio = email.toLowerCase().trim();
+  const id = correoLimpio.replace(/[^a-z0-9]/g, '_');
+  const ref = doc(db, "usuarios_sistema", id);
+  
+  const docSnap = await getDoc(ref);
+  if (docSnap.exists()) throw new Error("Este correo ya está registrado.");
+
+  const newUser = {
+    nombre: nombre || correoLimpio.split("@")[0],
+    email: correoLimpio,
+    password: password,
+    rol: "operador",
+    creado_en: serverTimestamp()
+  };
+  
+  await setDoc(ref, newUser);
+  currentUser = { uid: id, ...newUser };
+  emit();
+  return currentUser;
 }
 
 export async function logout() {
-  if (auth) await signOut(auth);
+  currentUser = null;
+  emit();
 }
 
 export function initAuth() {
   if (!isConfigured) {
-    // Sin configurar: dejamos currentUser en null y la app mostrará el aviso.
     emit();
     return;
   }
-  onAuthStateChanged(auth, async (user) => {
-    if (!user) { 
-      currentUser = null; 
-      emit(); 
-      return; 
-    }
+  
+  const saved = localStorage.getItem("prae_user");
+  if (saved) {
     try {
-      const ref = doc(db, "usuarios_sistema", user.uid);
-      const snap = await getDoc(ref);
-      let profile;
-      
-      if (snap.exists()) {
-        profile = snap.data();
-      } else {
-        // Esperamos a que se cree el documento ANTES de emitir
-        profile = { nombre: user.email.split("@")[0], email: user.email, rol: "operador", creado_en: serverTimestamp() };
-        await setDoc(ref, profile);
-      }
-      
-      currentUser = { uid: user.uid, email: user.email, ...profile };
-      // Solo emitimos al enrutador cuando ya sabemos con certeza el rol
-      emit(); 
-      
-    } catch (e) {
-      console.error("Error cargando perfil:", e);
-      currentUser = { uid: user.uid, email: user.email, nombre: user.email, rol: "operador" };
-      emit();
+      currentUser = JSON.parse(saved);
+    } catch(e) {
+      currentUser = null;
     }
-  });
+  }
+  emit();
 }
