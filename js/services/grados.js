@@ -31,20 +31,30 @@ export async function deleteGrado(id) {
   await deleteDoc(doc(db, COL, id));
 }
 
-// Seed inicial: 6A..11B + Externos. Se ejecuta una vez si la colección está vacía.
+// Seed inicial: Transición A-D, 1A..11D + Externos. Se ejecuta una vez si la colección está vacía.
 export async function seedGradosIfEmpty() {
   const snap = await getDocs(collection(db, COL));
   if (!snap.empty) return false;
-  const niveles = [6, 7, 8, 9, 10, 11];
-  const secciones = ["A", "B"];
+  
+  const secciones = ["A", "B", "C", "D"];
   let orden = 1;
   const writes = [];
-  for (const n of niveles) {
+  
+  // 1. Crear grados de Transición (Orden más bajo para que salgan de primero)
+  for (const s of secciones) {
+    writes.push(addDoc(collection(db, COL), { nombre: `Transición ${s}`, orden: orden++, es_virtual: false, activo: true, creado_en: serverTimestamp() }));
+  }
+  
+  // 2. Crear grados del 1 al 11
+  for (let i = 1; i <= 11; i++) {
     for (const s of secciones) {
-      writes.push(addDoc(collection(db, COL), { nombre: `${n}${s}`, orden: orden++, es_virtual: false, activo: true, creado_en: serverTimestamp() }));
+      writes.push(addDoc(collection(db, COL), { nombre: `${i}${s}`, orden: orden++, es_virtual: false, activo: true, creado_en: serverTimestamp() }));
     }
   }
+  
+  // 3. Crear Externos (Orden alto para que salga de último)
   writes.push(addDoc(collection(db, COL), { nombre: "Externos", orden: 999, es_virtual: true, activo: true, creado_en: serverTimestamp() }));
+  
   await Promise.all(writes);
   return true;
 }

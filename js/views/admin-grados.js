@@ -21,7 +21,11 @@ export async function renderAdminGrados({ mount }) {
   async function refresh() {
     const $t = $("#tabla", body);
     loading($t);
-    const grados = await listGrados({ soloActivos: false });
+    let grados = await listGrados({ soloActivos: false });
+    
+    // ORDENAMIENTO: Primero por el número de 'orden', luego alfabéticamente (A, B, C, D)
+    grados.sort((a, b) => a.orden - b.orden || a.nombre.localeCompare(b.nombre));
+
     if (!grados.length) { $t.innerHTML = `<div class="empty">Sin grados.</div>`; return; }
     $t.innerHTML = `
       <div class="table-wrap">

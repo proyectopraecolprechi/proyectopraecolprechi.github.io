@@ -17,7 +17,9 @@ export async function renderAdminReportes({ mount }) {
           <div class="field" style="margin:0;"><label>Mes</label>
             <select id="mes"><option value="">Todo el año</option>${MESES.map((m,i)=>`<option value="${i+1}">${m}</option>`).join("")}</select>
           </div>
-          <button id="csv" class="btn btn-secondary" style="margin-left:auto;"><i data-lucide="download"></i> Exportar CSV</button>
+          <button id="btn-excel" class="btn btn-primary" style="margin-left:auto; background: #0F172A; border-color: #0F172A; color: white;">
+            <i data-lucide="file-spreadsheet"></i> Exportar a Excel
+          </button>
         </div>
       </div>
       <div id="stats" class="stat-grid"></div>
@@ -75,23 +77,121 @@ export async function renderAdminReportes({ mount }) {
 
   $anio.addEventListener("change", refresh);
   $mes.addEventListener("change", refresh);
-  $("#csv", body).addEventListener("click", () => {
-    const rows = [["Tipo","Posición","Nombre","Kilos","Registros"]];
-    lastRanking.forEach((r,i) => rows.push(["Grado", i+1, r.grado, r.total_kilos, r.total_registros]));
-    
-    lastTop.forEach((r,i) => {
-      const e = estById[r.estudianteId];
-      // Misma lógica de prevención para el CSV
-      const nombreEst = e ? `${e.apellidos||""} ${e.nombres||""}` : "[Estudiante Eliminado]";
-      rows.push(["Estudiante", i+1, nombreEst, r.total_kilos, r.total_registros]);
-    });
-    
-    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `reporte_prae_${$anio.value}${$mes.value?"_"+$mes.value:""}.csv`;
-    a.click();
+  
+  $("#btn-excel", body).addEventListener("click", async (e) => {
+    const btn = e.currentTarget;
+    const originalHTML = btn.innerHTML;
+    // Efecto de carga en el botón
+    btn.innerHTML = `<div class="spinner" style="width:16px;height:16px;display:inline-block;vertical-align:middle;margin-right:8px;border-color:white;border-bottom-color:transparent;"></div> Procesando...`;
+    btn.disabled = true;
+
+    try {
+      // 1. Cargar la librería ExcelJS dinámicamente si no existe
+      if (!window.ExcelJS) {
+        await new Promise((resolve, reject) => {
+          const script = document.createElement("script");
+          script.src = "https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js";
+          script.onload = resolve;
+          script.onerror = reject;
+          document.head.appendChild(script);
+        });
+      }
+
+      const wb = new window.ExcelJS.Workbook();
+      
+      // 2. Definir estilos limpios, oscuros y modernos
+      const headerFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } }; // Pizarra oscuro moderno
+      const headerFont = { color: { argb: 'FFFFFFFF' }, bold: true, size: 11, name: 'Calibri' };
+      const altRowFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } }; // Gris/Azul muy claro para intercalar
+      const whiteFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } }; // Blanco
+      const borderStyle = {
+        top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        right: { style: 'thin', color: { argb: 'FFE2E8F0' } }
+      };
+
+      // Función auxiliar para aplicar bordes y estilo a una fila
+      const styleRow = (row, isHeader = false, isAlt = false) => {
+        row.eachCell(cell => {
+          cell.border = borderStyle;
+          cell.alignment = { vertical: 'middle', horizontal: 'center' };
+          if (isHeader) {
+            cell.fill = headerFill;
+            cell.font = headerFont;
+          } else {
+            cell.fill = isAlt ? altRowFill : whiteFill;
+            cell.font = { size: 11, name: 'Calibri', color: { argb: 'FF334155' } };
+          }
+        });
+        row.height = isHeader ? 25 : 20;
+      };
+
+      // --- HOJA 1: RANKING DE GRADOS ---
+      const wsGrados = wb.addWorksheet("Ranking Grados");
+      wsGrados.columns = [
+        { header: "Posición", key: "pos", width: 12 },
+        { header: "Nombre del Grado", key: "nombre", width: 30 },
+        { header: "Total Kilos", key: "kilos", width: 18 },
+        { header: "Cant. Registros", key: "registros", width: 18 }
+      ];
+
+      styleRow(wsGrados.getRow(1), true); // Dar estilo a la cabecera
+
+      lastRanking.forEach((r, i) => {
+        const row = wsGrados.addRow({
+          pos: i + 1,
+          nombre: r.grado,
+          kilos: parseFloat(r.total_kilos).toFixed(2),
+          registros: r.total_registros
+        });
+        styleRow(row, false, i % 2 !== 0); // Intercalar colores
+      });
+
+      // --- HOJA 2: TOP ESTUDIANTES ---
+      const wsEstudiantes = wb.addWorksheet("Top Estudiantes");
+      wsEstudiantes.columns = [
+        { header: "Posición", key: "pos", width: 12 },
+        { header: "Nombre del Estudiante", key: "nombre", width: 40 },
+        { header: "Grado", key: "grado", width: 20 },
+        { header: "Total Kilos", key: "kilos", width: 18 },
+        { header: "Cant. Registros", key: "registros", width: 18 }
+      ];
+
+      styleRow(wsEstudiantes.getRow(1), true); // Dar estilo a la cabecera
+
+      lastTop.forEach((r, i) => {
+        const e = estById[r.estudianteId];
+        const nombreEst = e ? `${e.apellidos || ""} ${e.nombres || ""}` : "[Estudiante Eliminado]";
+        const gradoEst = e ? (e.grado_actual_nombre || "") : "N/A";
+        
+        const row = wsEstudiantes.addRow({
+          pos: i + 1,
+          nombre: nombreEst,
+          grado: gradoEst,
+          kilos: parseFloat(r.total_kilos).toFixed(2),
+          registros: r.total_registros
+        });
+        styleRow(row, false, i % 2 !== 0); // Intercalar colores
+      });
+
+      // 3. Generar archivo XLSX y forzar descarga
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `Reporte_Colegio_Presentacion_${$anio.value}${$mes.value ? "_" + $mes.value : ""}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+
+    } catch (error) {
+      console.error("Error exportando a Excel:", error);
+      alert("Error al generar el archivo. Por favor verifica tu conexión a internet e inténtalo de nuevo.");
+    } finally {
+      // Restaurar el botón a su estado normal
+      btn.innerHTML = originalHTML;
+      btn.disabled = false;
+    }
   });
 
   refresh();
