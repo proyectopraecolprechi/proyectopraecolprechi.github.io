@@ -1,7 +1,8 @@
 import { el, clear, loading, empty, toast, refreshIcons, confirmModal, escapeHtml } from "../ui.js";
 import { renderShell } from "./shell.js"; // Importamos el layout del menú lateral
 import { db } from "../firebase-config.js";
-import { collection, getDocs, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+// Se agregó 'addDoc' a la importación
+import { collection, getDocs, doc, updateDoc, deleteDoc, addDoc } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
 
 export async function renderAdminOperadores({ mount }) {
   clear(mount);
@@ -14,9 +15,16 @@ export async function renderAdminOperadores({ mount }) {
           <h1>Gestión de Usuarios</h1>
           <p class="muted">Administra los operadores, credenciales y roles (Base de Datos).</p>
         </div>
-        <button class="btn btn-primary" id="btn-recargar">
-          <i data-lucide="refresh-cw"></i> Recargar
-        </button>
+        
+        <!-- Botones de acción -->
+        <div class="row" style="gap: 8px;">
+          <button class="btn btn-primary" id="btn-agregar">
+            <i data-lucide="plus"></i> Agregar
+          </button>
+          <button class="btn btn-secondary" id="btn-recargar">
+            <i data-lucide="refresh-cw"></i> Recargar
+          </button>
+        </div>
       </div>
 
       <div class="card">
@@ -44,6 +52,7 @@ export async function renderAdminOperadores({ mount }) {
 
   const tbody = mount.querySelector("#tabla-usuarios tbody");
   const btnRecargar = mount.querySelector("#btn-recargar");
+  const btnAgregar = mount.querySelector("#btn-agregar");
 
   async function cargarUsuarios() {
     loading(tbody);
@@ -109,6 +118,79 @@ export async function renderAdminOperadores({ mount }) {
       console.error(e);
       toast("Error al cargar los usuarios", { type: "error" });
     }
+  }
+
+  // Lógica para agregar usuario
+  function abrirModalAgregar() {
+    const overlay = el(`
+      <div class="modal-overlay">
+        <div class="modal">
+          <h2>Agregar Nuevo Usuario</h2>
+          <p class="hint" style="margin-bottom: 16px;">
+            Ingresa los datos para registrar un nuevo operador.
+          </p>
+          
+          <div class="field">
+            <label>Nombre de Usuario</label>
+            <input type="text" id="add-nombre" placeholder="Ej. Juan Pérez">
+          </div>
+          
+          <div class="field">
+            <label>Correo Electrónico (Login)</label>
+            <input type="email" id="add-email" placeholder="correo@ejemplo.com">
+          </div>
+
+          <div class="field">
+            <label>Contraseña</label>
+            <input type="text" id="add-password" placeholder="Mínimo 6 caracteres">
+          </div>
+          
+          <div class="field">
+            <label>Rol en el sistema</label>
+            <select id="add-rol">
+              <option value="operador">Operador (Normal)</option>
+              <option value="admin">Administrador</option>
+            </select>
+          </div>
+          
+          <div class="modal-actions" style="margin-top: 24px;">
+            <button class="btn btn-secondary" id="btn-cancel-add">Cancelar</button>
+            <button class="btn btn-primary" id="btn-save-add">Guardar Usuario</button>
+          </div>
+        </div>
+      </div>
+    `);
+
+    overlay.querySelector("#btn-cancel-add").onclick = () => overlay.remove();
+    
+    overlay.querySelector("#btn-save-add").onclick = async () => {
+      const nuevoNombre = overlay.querySelector("#add-nombre").value.trim();
+      const nuevoEmail = overlay.querySelector("#add-email").value.trim().toLowerCase();
+      const nuevaPassword = overlay.querySelector("#add-password").value.trim();
+      const nuevoRol = overlay.querySelector("#add-rol").value;
+
+      if (!nuevoNombre || !nuevoEmail || !nuevaPassword) {
+        toast("Todos los campos (nombre, correo y contraseña) son obligatorios.", { type: "error" });
+        return;
+      }
+
+      try {
+        await addDoc(collection(db, "usuarios_sistema"), {
+          nombre: nuevoNombre,
+          email: nuevoEmail,
+          password: nuevaPassword,
+          rol: nuevoRol
+        });
+        toast("Usuario agregado correctamente.", { type: "success" });
+        overlay.remove();
+        cargarUsuarios();
+      } catch (e) {
+        console.error(e);
+        toast("Error al agregar el usuario.", { type: "error" });
+      }
+    };
+
+    document.body.appendChild(overlay);
   }
 
   function abrirModalEdicion(userId, user) {
@@ -184,5 +266,6 @@ export async function renderAdminOperadores({ mount }) {
   }
 
   btnRecargar.onclick = cargarUsuarios;
+  btnAgregar.onclick = abrirModalAgregar;
   cargarUsuarios();
 }

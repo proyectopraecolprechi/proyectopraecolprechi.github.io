@@ -31,6 +31,11 @@ export function renderLogin({ mount }) {
           </button>
         </form>
       </div>
+      
+      <!-- Footer flotante -->
+      <div style="position: fixed; bottom: 20px; left: 0; width: 100%; text-align: center; color: var(--gris-500, #6b7280); font-size: 0.9rem; font-weight: 500; z-index: 10;">
+        Create by <a href="https://codematehub.com" target="_blank">Codematehub</a>
+      </div>
     </div>
   `);
   mount.appendChild(view);
