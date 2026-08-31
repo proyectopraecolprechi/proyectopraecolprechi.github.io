@@ -67,14 +67,41 @@ export async function renderAdminOperadores({ mount }) {
             <td><span style="font-family: monospace; color: var(--gris-700); background: var(--gris-100); padding: 2px 6px; border-radius: 4px;">${escapeHtml(user.password || "Sin asignar")}</span></td>
             <td><span class="badge ${user.rol === 'admin' ? 'admin' : 'activo'}">${escapeHtml(user.rol || "operador")}</span></td>
             <td>
-              <button class="btn btn-secondary btn-edit" style="padding: 6px 12px; min-height: unset;">
-                <i data-lucide="edit"></i> Editar
-              </button>
+              <div class="row" style="gap: 8px;">
+                <button class="btn btn-secondary btn-edit" style="padding: 6px 12px; min-height: unset;" title="Editar">
+                  <i data-lucide="edit"></i> Editar
+                </button>
+                <button class="btn btn-danger btn-delete" style="padding: 6px 12px; min-height: unset;" title="Eliminar">
+                  <i data-lucide="trash-2"></i> Eliminar
+                </button>
+              </div>
             </td>
           </tr>
         `);
 
         tr.querySelector(".btn-edit").onclick = () => abrirModalEdicion(userId, user);
+        
+        // Lógica para eliminar usuario
+        tr.querySelector(".btn-delete").onclick = async () => {
+          const seguro = await confirmModal({
+            title: "Eliminar Usuario",
+            body: `¿Estás seguro de que deseas eliminar permanentemente al usuario <strong>${escapeHtml(user.nombre)}</strong>? Ya no podrá iniciar sesión en el sistema.`,
+            danger: true,
+            confirmText: "Sí, eliminar"
+          });
+
+          if (seguro) {
+            try {
+              await deleteDoc(doc(db, "usuarios_sistema", userId));
+              toast("Usuario eliminado correctamente.", { type: "success" });
+              cargarUsuarios(); // Recargar la tabla
+            } catch (e) {
+              console.error(e);
+              toast("Error al eliminar el usuario.", { type: "error" });
+            }
+          }
+        };
+
         tbody.appendChild(tr);
       });
       refreshIcons();
