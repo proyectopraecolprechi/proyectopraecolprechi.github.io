@@ -13,7 +13,7 @@ export async function renderAdminOperadores({ mount }) {
       <div class="row between" style="margin-bottom: 24px;">
         <div>
           <h1>Gestión de Usuarios</h1>
-          <p class="muted">Administra los operadores, credenciales y roles (Base de Datos).</p>
+          <p class="muted">Administra los operadores, credenciales y roles.</p>
         </div>
         
         <!-- Botones de acción -->
@@ -136,7 +136,7 @@ export async function renderAdminOperadores({ mount }) {
           </div>
           
           <div class="field">
-            <label>Correo Electrónico (Login)</label>
+            <label>Correo Electrónico</label>
             <input type="email" id="add-email" placeholder="correo@ejemplo.com">
           </div>
 
@@ -208,7 +208,7 @@ export async function renderAdminOperadores({ mount }) {
           </div>
           
           <div class="field">
-            <label>Correo Electrónico (Login)</label>
+            <label>Correo Electrónico</label>
             <input type="email" id="edit-email" value="${escapeHtml(user.email || "")}">
           </div>
 
