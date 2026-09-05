@@ -23,7 +23,7 @@ export async function renderAdminGrados({ mount }) {
     loading($t);
     let grados = await listGrados({ soloActivos: false });
     
-    // ORDENAMIENTO: Primero por el número de 'orden', luego alfabéticamente (A, B, C, D)
+    // ordenamiento de los grados por orden y nombre osea por orden de edad y luego por el curso o abcd
     grados.sort((a, b) => a.orden - b.orden || a.nombre.localeCompare(b.nombre));
 
     if (!grados.length) { $t.innerHTML = `<div class="empty">Sin grados.</div>`; return; }

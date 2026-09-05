@@ -50,10 +50,10 @@ import {
 
 
 
-// ... (Tus funciones existentes: listByGrado, listAll, getEstudiante, createEstudiante, updateDoc)
+
 
 /**
- * Elimina definitivamente un documento de estudiante de la colección en Firestore
+ * Elimina para y por siempre el documento de estudiante de la colección en 🔥store
  * @param {string} id - UID del documento del estudiante
  */
 export async function deleteEstudianteFisico(id) {

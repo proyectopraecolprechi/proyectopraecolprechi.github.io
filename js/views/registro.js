@@ -222,7 +222,7 @@ export async function renderRegistro({ mount }) {
       
       refreshIcons();
       
-      // Asignar el evento de eliminación a los botones
+      // eliminación de los botones
       $ultimos.querySelectorAll('.btn-delete-reg').forEach(btn => {
         btn.addEventListener('click', async (e) => {
             const id = e.currentTarget.dataset.id;
@@ -238,7 +238,7 @@ export async function renderRegistro({ mount }) {
         });
       });
 
-      // Crear un bucle invisible para que los botones desaparezcan automáticamente pasado el minuto
+      // bucle para que el boon eliminar desaparesca a el minuto
       if (hideExpiredInterval) clearInterval(hideExpiredInterval);
       hideExpiredInterval = setInterval(() => {
           if (!document.body.contains($ultimos)) {
@@ -252,7 +252,7 @@ export async function renderRegistro({ mount }) {
                   btn.remove(); // El botón desaparece
               }
           });
-      }, 5000); // Revisa la edad de los botones cada 5 segundos
+      }, 5000); // tiempo de comprobación cada 5 segundos para no sobrecargar el navegador
 
     } catch (e) {
       empty($ultimos, "No se pudo cargar el historial.");

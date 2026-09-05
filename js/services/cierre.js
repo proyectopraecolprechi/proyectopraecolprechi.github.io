@@ -5,7 +5,6 @@ import {
 import { listGrados } from "./grados.js";
 import { listAll as listEstudiantes } from "./estudiantes.js";
 
-// Propuesta automática: 6A→7A, 11B→egresado
 export async function buildPropuesta() {
   const grados = await listGrados({ soloActivos: true });
   const reales = grados.filter(g => !g.es_virtual);
@@ -35,7 +34,6 @@ export async function buildPropuesta() {
   });
 }
 
-// Aplica los cambios. `decisiones` es array de { estudianteId, action, nuevo_grado_id, nuevo_grado_nombre }
 export async function aplicarCierre({ anio, decisiones, ejecutado_por }) {
   const batch = writeBatch(db);
   let promovidos = 0, repetidos = 0, retirados = 0, egresados = 0;
@@ -46,7 +44,7 @@ export async function aplicarCierre({ anio, decisiones, ejecutado_por }) {
       batch.update(ref, { grado_actual_id: d.nuevo_grado_id, grado_actual_nombre: d.nuevo_grado_nombre });
       promovidos++;
     } else if (d.action === "repetir") {
-      repetidos++; // sin cambios
+      repetidos++;
     } else if (d.action === "retirar") {
       batch.update(ref, { estado: "inactivo" });
       retirados++;

@@ -61,7 +61,7 @@ export async function renderAdminReportes({ mount }) {
     lastTop = await topEstudiantes({ anio, max: 50 });
     $("#top", body).innerHTML = `<div class="rank-list">` + lastTop.map((r,i)=>{
       const e = estById[r.estudianteId];
-      // Si el estudiante fue eliminado, estById no lo encontrará, evitamos imprimir el ID.
+      // evitar poner el id si el estudiante no esta
       const nombreEst = e ? escapeHtml(`${e.apellidos||""} ${e.nombres||""}`) : "[Estudiante Eliminado]";
       
       return `<div class="rank-item ${i<3?"top-"+(i+1):""}">
@@ -81,12 +81,11 @@ export async function renderAdminReportes({ mount }) {
   $("#btn-excel", body).addEventListener("click", async (e) => {
     const btn = e.currentTarget;
     const originalHTML = btn.innerHTML;
-    // Efecto de carga en el botón
     btn.innerHTML = `<div class="spinner" style="width:16px;height:16px;display:inline-block;vertical-align:middle;margin-right:8px;border-color:white;border-bottom-color:transparent;"></div> Procesando...`;
     btn.disabled = true;
 
     try {
-      // 1. Cargar la librería ExcelJS dinámicamente si no existe
+      // librería ExcelJS dinámicamente si no existe
       if (!window.ExcelJS) {
         await new Promise((resolve, reject) => {
           const script = document.createElement("script");
@@ -99,7 +98,7 @@ export async function renderAdminReportes({ mount }) {
 
       const wb = new window.ExcelJS.Workbook();
       
-      // 2. Definir estilos limpios, oscuros y modernos
+      // estilos oscuros y que se ven modernos osea bacanos
       const headerFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } }; // Pizarra oscuro moderno
       const headerFont = { color: { argb: 'FFFFFFFF' }, bold: true, size: 11, name: 'Calibri' };
       const altRowFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } }; // Gris/Azul muy claro para intercalar
@@ -111,7 +110,6 @@ export async function renderAdminReportes({ mount }) {
         right: { style: 'thin', color: { argb: 'FFE2E8F0' } }
       };
 
-      // Función auxiliar para aplicar bordes y estilo a una fila
       const styleRow = (row, isHeader = false, isAlt = false) => {
         row.eachCell(cell => {
           cell.border = borderStyle;
@@ -148,7 +146,6 @@ export async function renderAdminReportes({ mount }) {
         styleRow(row, false, i % 2 !== 0); // Intercalar colores
       });
 
-      // --- HOJA 2: TOP ESTUDIANTES ---
       const wsEstudiantes = wb.addWorksheet("Top Estudiantes");
       wsEstudiantes.columns = [
         { header: "Posición", key: "pos", width: 12 },
@@ -172,7 +169,7 @@ export async function renderAdminReportes({ mount }) {
           kilos: parseFloat(r.total_kilos).toFixed(2),
           registros: r.total_registros
         });
-        styleRow(row, false, i % 2 !== 0); // Intercalar colores
+        styleRow(row, false, i % 2 !== 0); // intercalacolor
       });
 
       // 3. Generar archivo XLSX y forzar descarga
@@ -188,7 +185,7 @@ export async function renderAdminReportes({ mount }) {
       console.error("Error exportando a Excel:", error);
       alert("Error al generar el archivo. Por favor verifica tu conexión a internet e inténtalo de nuevo.");
     } finally {
-      // Restaurar el botón a su estado normal
+      // restauracion de el boton
       btn.innerHTML = originalHTML;
       btn.disabled = false;
     }

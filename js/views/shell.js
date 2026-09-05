@@ -1,4 +1,4 @@
-// Shell para vistas autenticadas: topbar + sidebar (admin) o bottom-nav (operador)
+// barra lateral y demás vista para un admin que no ve un operador normal
 import { el, refreshIcons } from "../ui.js";
 import { getCurrentUser, isAdmin, logout } from "../auth.js";
 import { currentPath } from "../router.js";
@@ -29,7 +29,6 @@ export function renderShell(viewBody) {
   const shell = el(`<div class="app-shell ${admin ? "has-sidebar" : ""}"></div>`);
 
   if (admin) {
-    // Fondo oscuro al abrir el menú en móviles
     const overlay = el(`<div class="sidebar-overlay"></div>`);
     overlay.addEventListener("click", () => shell.classList.remove("sidebar-open"));
     shell.appendChild(overlay);
@@ -44,7 +43,6 @@ export function renderShell(viewBody) {
       </aside>
     `);
     
-    // Cerrar menú al hacer clic en un enlace (móviles)
     side.querySelectorAll('nav a').forEach(a => {
       a.addEventListener('click', () => shell.classList.remove('sidebar-open'));
     });
@@ -69,7 +67,7 @@ export function renderShell(viewBody) {
     </header>
   `);
   
-  // Abrir menú lateral
+
   if (admin) {
     top.querySelector('.menu-btn').addEventListener("click", () => {
       shell.classList.add("sidebar-open");
@@ -83,7 +81,7 @@ export function renderShell(viewBody) {
   mainEl.appendChild(viewBody);
   main.appendChild(mainEl);
 
-  // Menú inferior para operadores
+
   if (!admin) {
     const nav = el(`
       <nav class="bottom-nav">

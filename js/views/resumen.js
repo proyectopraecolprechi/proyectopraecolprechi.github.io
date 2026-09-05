@@ -63,7 +63,7 @@ export async function renderResumen({ mount }) {
       <div class="stat"><div class="label">Registros</div><div class="value">${global.total_registros || 0}</div></div>
     `;
 
-    // Ranking
+    // los tops
     const $rank = $("#ranking", body);
     loading($rank);
     const ranking = await rankingGrados(grados, { anio, mes });
@@ -78,7 +78,7 @@ export async function renderResumen({ mount }) {
       `).join("") + `</div>`;
     }
 
-    // Top estudiantes (por año o total)
+    // estudiantes tops
     const $top = $("#top", body);
     loading($top);
     const tops = await topEstudiantes({ anio, max: 50 });

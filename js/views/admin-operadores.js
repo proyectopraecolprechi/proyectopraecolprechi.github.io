@@ -1,13 +1,12 @@
 import { el, clear, loading, empty, toast, refreshIcons, confirmModal, escapeHtml } from "../ui.js";
-import { renderShell } from "./shell.js"; // Importamos el layout del menú lateral
+import { renderShell } from "./shell.js";
 import { db } from "../firebase-config.js";
-// Se agregó 'addDoc' a la importación
 import { collection, getDocs, doc, updateDoc, deleteDoc, addDoc } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
 
 export async function renderAdminOperadores({ mount }) {
   clear(mount);
   
-  // Creamos solo el contenido principal
+
   const body = el(`
     <section>
       <div class="row between" style="margin-bottom: 24px;">
@@ -46,7 +45,6 @@ export async function renderAdminOperadores({ mount }) {
     </section>
   `);
 
-  // Envolvemos el contenido en el layout que ya tiene el sidebar y lo inyectamos
   mount.appendChild(renderShell(body));
   refreshIcons();
 
@@ -120,7 +118,6 @@ export async function renderAdminOperadores({ mount }) {
     }
   }
 
-  // Lógica para agregar usuario
   function abrirModalAgregar() {
     const overlay = el(`
       <div class="modal-overlay">

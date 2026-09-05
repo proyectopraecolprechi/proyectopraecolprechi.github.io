@@ -45,7 +45,7 @@ export async function topEstudiantes({ anio = null, max = 50 } = {}) {
     
     const data = d.data();
     
-    // FILTRO: Si el estudiante tiene 0 kg (por ejemplo, si fue eliminado y se restaron sus aportes), lo ignoramos
+    // filtro por si un man tiene 0 kg
     if ((data.total_kilos || 0) <= 0) return;
 
     const estudianteId = id.slice(prefix.length, id.length - suffix.length);

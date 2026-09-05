@@ -9,7 +9,7 @@ import { renderAdminGrados } from "./views/admin-grados.js";
 import { renderAdminEstudiantes } from "./views/admin-estudiantes.js";
 import { renderAdminReportes } from "./views/admin-reportes.js";
 import { renderCierreAnio } from "./views/cierre-anio.js";
-import { renderAdminOperadores } from "./views/admin-operadores.js"; // NUEVA RUTA IMPORTADA
+import { renderAdminOperadores } from "./views/admin-operadores.js";
 import { refreshIcons } from "./ui.js";
 
 function boot() {
@@ -25,7 +25,7 @@ function boot() {
   defineRoute("/admin/estudiantes", renderAdminEstudiantes, { adminOnly: true });
   defineRoute("/admin/reportes", renderAdminReportes, { adminOnly: true });
   defineRoute("/admin/cierre", renderCierreAnio, { adminOnly: true });
-  defineRoute("/admin/operadores", renderAdminOperadores, { adminOnly: true }); // NUEVA RUTA DEFINIDA
+  defineRoute("/admin/operadores", renderAdminOperadores, { adminOnly: true });
 
   initRouter(mount);
   initAuth();

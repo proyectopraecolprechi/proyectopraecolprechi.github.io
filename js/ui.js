@@ -1,4 +1,4 @@
-// UI helpers: DOM, iconos, toasts, modales
+// dom, iconos, toasts, modales como los de ingles jaja
 
 export const $ = (sel, root = document) => root.querySelector(sel);
 export const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));

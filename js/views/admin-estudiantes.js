@@ -4,7 +4,7 @@ import { listGrados } from "../services/grados.js";
 import { listAll, createEstudiante, updateEstudiante, setEstado, deleteEstudianteFisico } from "../services/estudiantes.js";
 import { db } from "../firebase-config.js";
 import { collection, query, where, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
-import { deleteRegistro } from "../services/registros.js"; // IMPORTANTE: Agregado para actualizar estadísticas
+import { deleteRegistro } from "../services/registros.js";
 
 export async function renderAdminEstudiantes({ mount }) {
   const body = el(`
@@ -111,7 +111,6 @@ export async function renderAdminEstudiantes({ mount }) {
           try {
             loading($("#tabla", body));
             
-            // 1. Buscar y ELIMINAR los registros del estudiante (usando deleteRegistro para propagar las estadísticas)
             const qDocs = query(collection(db, "registros_reciclaje"), where("id_estudiante", "==", e.id));
             const snap = await getDocs(qDocs);
             
@@ -121,7 +120,6 @@ export async function renderAdminEstudiantes({ mount }) {
               }
             }
 
-            // Eliminar de colección antigua por seguridad (sin afectar estadísticas)
             const qDocsAntiguos = query(collection(db, "registros"), where("id_estudiante", "==", e.id));
             const snapAntiguos = await getDocs(qDocsAntiguos);
             if (!snapAntiguos.empty) {
@@ -132,7 +130,6 @@ export async function renderAdminEstudiantes({ mount }) {
               await batchAntiguos.commit();
             }
 
-            // 2. Eliminar al estudiante físicamente
             await deleteEstudianteFisico(e.id);
             
             toast("Estudiante y todos sus aportes eliminados.", { type: "success" });
