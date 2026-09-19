@@ -29,15 +29,42 @@ export async function renderCierreAnio({ mount }) {
   cargar();
 
   async function cargar() {
-    const $c = $("#contenido", body);
+    const $c =$("#contenido", body);
     loading($c);
-    let decisiones = (await buildPropuesta()).map(d => ({
-      estudianteId: d.estudiante.id,
-      estudiante: d.estudiante,
-      action: d.action === "promover_manual" ? "manual" : d.action,
-      nuevo_grado_id: d.nuevo_grado_id,
-      nuevo_grado_nombre: d.nuevo_grado_nombre,
-    }));
+    let propuestaBase = await buildPropuesta();
+
+    let decisiones = propuestaBase.map(d => {
+      const gradoActual = grados.find(g => g.id === d.estudiante.grado_actual_id);
+      let orden = gradoActual ? gradoActual.orden : 9999;
+      
+      // Inteligencia para ordenar los grados (incluso los fantasmas) por nombre
+      const nom = (d.estudiante.grado_actual_nombre || "").toLowerCase();
+      if (nom.includes("jardin") || nom.includes("jardín")) {
+        orden = Math.min(orden, -20); // Fuerza a Jardín a ser el primero absoluto
+      } else if (nom.includes("transicion") || nom.includes("transición") || nom.match(/^tr/)) {
+        orden = Math.min(orden, -10); // Fuerza a Transición justo después de Jardín
+      }
+
+      return {
+        estudianteId: d.estudiante.id,
+        estudiante: d.estudiante,
+        action: d.action === "promover_manual" ? "manual" : d.action,
+        nuevo_grado_id: d.nuevo_grado_id,
+        nuevo_grado_nombre: d.nuevo_grado_nombre,
+        orden_actual: orden
+      };
+    });
+
+    // Ordenar de menor a mayor grado y luego alfabéticamente
+    decisiones.sort((a, b) => {
+      if (a.orden_actual !== b.orden_actual) {
+        return a.orden_actual - b.orden_actual;
+      }
+      const nombreA = `${a.estudiante.apellidos||""} ${a.estudiante.nombres||""}`.toLowerCase();
+      const nombreB = `${b.estudiante.apellidos||""} ${b.estudiante.nombres||""}`.toLowerCase();
+      return nombreA.localeCompare(nombreB);
+    });
+
     if (!decisiones.length) { $c.innerHTML = `<div class="empty">No hay estudiantes activos.</div>`; return; }
 
     function render() {
@@ -56,15 +83,14 @@ export async function renderCierreAnio({ mount }) {
               <tbody>
               ${decisiones.map((d, i) => `
                 <tr>
-                  <td>${escapeHtml(d.estudiante.apellidos||"")} ${escapeHtml(d.estudiante.nombres||"")}</td>
+                  <td>${escapeHtml(d?.estudiante?.apellidos || "")} ${escapeHtml(d?.estudiante?.nombres || "")}</td>
                   <td>${escapeHtml(d.estudiante.grado_actual_nombre||"")}</td>
                   <td>
                     <select data-i="${i}" data-field="action">
                       <option value="promover" ${d.action==="promover"?"selected":""}>Promover</option>
                       <option value="repetir" ${d.action==="repetir"?"selected":""}>Repetir</option>
                       <option value="retirar" ${d.action==="retirar"?"selected":""}>Retirar</option>
-                      <!-- <option value="egresar" ${d.action==="egresar"?"selected":""}>Egresar</option> -->
-                      <!-- <option value="manual" ${d.action==="manual"?"selected":""}>Asignar manual</option> -->
+                      <option value="egresar" ${d.action==="egresar"?"selected":""}>Egresar</option>
                     </select>
                   </td>
                   <td>
