@@ -30,12 +30,12 @@ export async function renderAdminReportes({ mount }) {
   mount.appendChild(renderShell(body));
   refreshIcons();
 
-  const $anio = $("#anio", body);
-  const $mes = $("#mes", body);
+  const $anio =$("#anio", body);
+  const $mes =$("#mes", body);
   for (let y = anioActual; y >= anioActual - 5; y--) $anio.appendChild(el(`<option value="${y}">${y}</option>`));
 
   const grados = (await listGrados({ soloActivos: false })).filter(g => !g.es_virtual);
-  const estudiantes = await listEstudiantes();
+  const estudiantes = await listEstudiantes() || [];
   const estById = Object.fromEntries(estudiantes.map(e => [e.id, e]));
 
   let lastRanking = [], lastTop = [];
@@ -43,25 +43,27 @@ export async function renderAdminReportes({ mount }) {
   async function refresh() {
     const anio = Number($anio.value);
     const mes = $mes.value ? Number($mes.value) : null;
-    const global = await getGlobal({ anio, mes });
+    const global = await getGlobal({ anio, mes }) || { total_kilos: 0, total_registros: 0 };
+    
     $("#stats", body).innerHTML = `
-      <div class="stat"><div class="label">Total kilos</div><div class="value">${formatKg(global.total_kilos)}</div></div>
+      <div class="stat"><div class="label">Total kilos</div><div class="value">${formatKg(global.total_kilos || 0)}</div></div>
       <div class="stat"><div class="label">Registros</div><div class="value">${global.total_registros || 0}</div></div>
       <div class="stat"><div class="label">Grados activos</div><div class="value">${grados.length}</div></div>
       <div class="stat"><div class="label">Estudiantes</div><div class="value">${estudiantes.filter(e=>e.estado==="activo").length}</div></div>
     `;
 
     loading($("#ranking", body));
-    lastRanking = await rankingGrados(grados, { anio, mes });
+    lastRanking = (await rankingGrados(grados, { anio, mes })) || [];
     $("#ranking", body).innerHTML = `<div class="rank-list">` + lastRanking.map((r,i)=>`
       <div class="rank-item ${i<3?"top-"+(i+1):""}"><div class="pos">${i+1}</div><div class="name">${escapeHtml(r.grado)}</div><div class="kg">${formatKg(r.total_kilos)}</div></div>
     `).join("") + `</div>`;
 
     loading($("#top", body));
-    lastTop = await topEstudiantes({ anio, max: 50 });
-    $("#top", body).innerHTML = `<div class="rank-list">` + lastTop.map((r,i)=>{
+    lastTop = (await topEstudiantes({ anio, max: 10000 })) || [];
+    
+    const topView = lastTop.slice(0, 50);
+    $("#top", body).innerHTML = `<div class="rank-list">` + topView.map((r,i)=>{
       const e = estById[r.estudianteId];
-      // evitar poner el id si el estudiante no esta
       const nombreEst = e ? escapeHtml(`${e.apellidos||""} ${e.nombres||""}`) : "[Estudiante Eliminado]";
       
       return `<div class="rank-item ${i<3?"top-"+(i+1):""}">
@@ -78,14 +80,13 @@ export async function renderAdminReportes({ mount }) {
   $anio.addEventListener("change", refresh);
   $mes.addEventListener("change", refresh);
   
-  $("#btn-excel", body).addEventListener("click", async (e) => {
+  $("#btn-excel", body)?.addEventListener("click", async (e) => {
     const btn = e.currentTarget;
     const originalHTML = btn.innerHTML;
     btn.innerHTML = `<div class="spinner" style="width:16px;height:16px;display:inline-block;vertical-align:middle;margin-right:8px;border-color:white;border-bottom-color:transparent;"></div> Procesando...`;
     btn.disabled = true;
 
     try {
-      // librería ExcelJS dinámicamente si no existe
       if (!window.ExcelJS) {
         await new Promise((resolve, reject) => {
           const script = document.createElement("script");
@@ -98,11 +99,10 @@ export async function renderAdminReportes({ mount }) {
 
       const wb = new window.ExcelJS.Workbook();
       
-      // estilos oscuros y que se ven modernos osea bacanos
-      const headerFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } }; // Pizarra oscuro moderno
+      const headerFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } };
       const headerFont = { color: { argb: 'FFFFFFFF' }, bold: true, size: 11, name: 'Calibri' };
-      const altRowFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } }; // Gris/Azul muy claro para intercalar
-      const whiteFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } }; // Blanco
+      const altRowFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+      const whiteFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
       const borderStyle = {
         top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
         bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
@@ -125,7 +125,6 @@ export async function renderAdminReportes({ mount }) {
         row.height = isHeader ? 25 : 20;
       };
 
-      // --- HOJA 1: RANKING DE GRADOS ---
       const wsGrados = wb.addWorksheet("Ranking Grados");
       wsGrados.columns = [
         { header: "Posición", key: "pos", width: 12 },
@@ -133,20 +132,19 @@ export async function renderAdminReportes({ mount }) {
         { header: "Total Kilos", key: "kilos", width: 18 },
         { header: "Cant. Registros", key: "registros", width: 18 }
       ];
+      styleRow(wsGrados.getRow(1), true);
 
-      styleRow(wsGrados.getRow(1), true); // Dar estilo a la cabecera
-
-      lastRanking.forEach((r, i) => {
+      (lastRanking || []).forEach((r, i) => {
         const row = wsGrados.addRow({
           pos: i + 1,
           nombre: r.grado,
-          kilos: parseFloat(r.total_kilos).toFixed(2),
+          kilos: parseFloat(r.total_kilos || 0).toFixed(2),
           registros: r.total_registros
         });
-        styleRow(row, false, i % 2 !== 0); // Intercalar colores
+        styleRow(row, false, i % 2 !== 0);
       });
 
-      const wsEstudiantes = wb.addWorksheet("Top Estudiantes");
+      const wsEstudiantes = wb.addWorksheet("Ranking Estudiantes");
       wsEstudiantes.columns = [
         { header: "Posición", key: "pos", width: 12 },
         { header: "Nombre del Estudiante", key: "nombre", width: 40 },
@@ -154,10 +152,9 @@ export async function renderAdminReportes({ mount }) {
         { header: "Total Kilos", key: "kilos", width: 18 },
         { header: "Cant. Registros", key: "registros", width: 18 }
       ];
+      styleRow(wsEstudiantes.getRow(1), true);
 
-      styleRow(wsEstudiantes.getRow(1), true); // Dar estilo a la cabecera
-
-      lastTop.forEach((r, i) => {
+      (lastTop || []).forEach((r, i) => {
         const e = estById[r.estudianteId];
         const nombreEst = e ? `${e.apellidos || ""} ${e.nombres || ""}` : "[Estudiante Eliminado]";
         const gradoEst = e ? (e.grado_actual_nombre || "") : "N/A";
@@ -166,13 +163,12 @@ export async function renderAdminReportes({ mount }) {
           pos: i + 1,
           nombre: nombreEst,
           grado: gradoEst,
-          kilos: parseFloat(r.total_kilos).toFixed(2),
+          kilos: parseFloat(r.total_kilos || 0).toFixed(2),
           registros: r.total_registros
         });
-        styleRow(row, false, i % 2 !== 0); // intercalacolor
+        styleRow(row, false, i % 2 !== 0);
       });
 
-      // 3. Generar archivo XLSX y forzar descarga
       const buffer = await wb.xlsx.writeBuffer();
       const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
       const a = document.createElement("a");
@@ -185,7 +181,6 @@ export async function renderAdminReportes({ mount }) {
       console.error("Error exportando a Excel:", error);
       alert("Error al generar el archivo. Por favor verifica tu conexión a internet e inténtalo de nuevo.");
     } finally {
-      // restauracion de el boton
       btn.innerHTML = originalHTML;
       btn.disabled = false;
     }

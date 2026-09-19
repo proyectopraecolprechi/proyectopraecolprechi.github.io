@@ -37,6 +37,11 @@ p { margin: 0; }
 a { color: var(--verde-700); text-decoration: none; }
 button { font-family: inherit; }
 
+/* === Transiciones globales para un modo oscuro elegante === */
+body, .card, .topbar, .sidebar, .bottom-nav, .stat, .rank-item, .field input, .field select, table.data th, table.data td, .modal {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
 /* === Layout === */
 #prae-root { min-height: 100vh; }
 .app-shell { display: flex; flex-direction: column; min-height: 100vh; }
@@ -57,7 +62,7 @@ button { font-family: inherit; }
 .topbar .brand { display: flex; align-items: center; gap: 8px; font-family: var(--font-display); font-weight: 800; color: var(--verde-700); }
 .topbar .brand i { color: var(--verde-600); }
 .topbar .user { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--gris-700); }
-.topbar .user button { background: none; border: none; color: var(--rojo); cursor: pointer; padding: 6px; }
+.topbar .user button[data-action="logout"] { background: none; border: none; color: var(--rojo); cursor: pointer; padding: 6px; }
 
 /* === Bottom nav (operador) === */
 .bottom-nav {
@@ -82,6 +87,11 @@ button { font-family: inherit; }
   border-right: 1px solid var(--gris-200);
   padding: 18px 12px;
   width: 240px; flex-shrink: 0;
+  /* Configuración sticky (anclada) para páginas largas */
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
 }
 .sidebar .brand { display: flex; align-items: center; gap: 8px; font-family: var(--font-display); font-weight: 800; color: var(--verde-700); padding: 0 8px 18px; }
 .sidebar nav { display: flex; flex-direction: column; gap: 2px; }
@@ -123,7 +133,7 @@ button { font-family: inherit; }
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   padding: 12px 18px; min-height: 48px; border-radius: 10px;
   border: 1px solid transparent; cursor: pointer; font-weight: 600; font-size: 0.95rem;
-  transition: background .15s, transform .05s;
+  transition: background .15s, transform .05s, color 0.15s, border-color 0.15s;
 }
 .btn:active { transform: translateY(1px); }
 .btn-primary { background: var(--verde-600); color: white; }
@@ -174,7 +184,7 @@ table.data tbody tr:hover { background: var(--verde-50); }
 
 /* === Modales === */
 .modal-overlay { position: fixed; inset: 0; background: rgb(0 0 0 / 0.5); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 16px; }
-.modal { background: white; border-radius: 14px; padding: 24px; width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto; }
+.modal { background: var(--blanco); border-radius: 14px; padding: 24px; width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto; }
 .modal h2 { margin-bottom: 16px; }
 .modal .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
 
@@ -201,11 +211,29 @@ table.data tbody tr:hover { background: var(--verde-50); }
 @media (max-width: 899px) { 
   .menu-btn { display: block; }
   .sidebar {
-    display: flex; flex-direction: column; gap: 12px; /*para que se vea la sidebar en el cel y bien tambien*/
+    display: flex; flex-direction: column; gap: 12px;
     position: fixed; top: 0; left: 0; bottom: 0; z-index: 40;
     transform: translateX(-100%); transition: transform 0.3s ease;
     box-shadow: var(--sombra);
   }
   .app-shell.sidebar-open .sidebar { transform: translateX(0); }
   .app-shell.sidebar-open .sidebar-overlay { opacity: 1; pointer-events: auto; }
+}
+
+/* === MODO OSCURO (Colores elegantes y de buen contraste) === */
+body.dark-mode {
+  --blanco:    oklch(0.18 0.01 250); /* Fondos de tarjetas, barra lateral y topbar */
+  --gris-100:  oklch(0.13 0.01 250); /* Fondo general del body y headers de tabla */
+  --gris-200:  oklch(0.25 0.01 250); /* Bordes suaves */
+  --gris-300:  oklch(0.35 0.01 250); /* Bordes de inputs */
+  --gris-500:  oklch(0.65 0.01 250); /* Textos secundarios y labels */
+  --gris-700:  oklch(0.85 0.01 250); /* Textos primarios normales */
+  --gris-900:  oklch(0.98 0.01 250); /* Títulos importantes o fuertes */
+  --verde-50:  oklch(0.22 0.05 150); /* Fondos hover y badges */
+  --verde-100: oklch(0.30 0.1 150);  /* Botones secundarios verdes */
+  --rojo:      oklch(0.65 0.2 25);   /* Botones de eliminar adaptados */
+}
+
+body.dark-mode .app-shell .sidebar-overlay {
+  background: rgba(0,0,0,0.7);
 }

@@ -1,11 +1,10 @@
-// barra lateral y demás vista para un admin que no ve un operador normal
 import { el, refreshIcons } from "../ui.js";
 import { getCurrentUser, isAdmin, logout } from "../auth.js";
 import { currentPath } from "../router.js";
 
 export function renderShell(viewBody) {
-  const user = getCurrentUser();
-  const path = currentPath();
+  const user = getCurrentUser() || {};
+  const path = currentPath() || "";
   const admin = isAdmin();
 
   const navItemsOp = [
@@ -47,7 +46,7 @@ export function renderShell(viewBody) {
       a.addEventListener('click', () => shell.classList.remove('sidebar-open'));
     });
     
-    side.querySelector('[data-action="logout"]').addEventListener("click", (e) => { e.preventDefault(); logout(); });
+    side.querySelector('[data-action="logout"]')?.addEventListener("click", (e) => { e.preventDefault(); logout(); });
     shell.appendChild(side);
   }
 
@@ -60,6 +59,7 @@ export function renderShell(viewBody) {
         <i data-lucide="leaf"></i> PRAE Reciclaje
       </div>
       <div class="user">
+        <button id="theme-toggle" style="background:transparent; border:none; cursor:pointer; display:flex; align-items:center; padding:6px; border-radius:50%; transition:transform 0.4s ease; margin-right:4px;" title="Cambiar tema"></button>
         <span class="badge ${admin ? "admin" : "activo"}">${admin ? "Admin" : "Operador"}</span>
         <span class="hide-mobile">${user?.nombre || user?.email || ""}</span>
         <button data-action="logout" title="Cerrar sesión"><i data-lucide="log-out"></i></button>
@@ -67,20 +67,44 @@ export function renderShell(viewBody) {
     </header>
   `);
   
+  // Modo oscuro seguro (protegido contra bloqueos de localStorage)
+  try {
+    const themeBtn = top.querySelector('#theme-toggle');
+    const isDark = localStorage.getItem('theme') === 'dark';
+    if (isDark) document.body.classList.add('dark-mode');
+
+    if (themeBtn) {
+      const updateThemeIcon = () => {
+        const dark = document.body.classList.contains('dark-mode');
+        themeBtn.innerHTML = dark ? '<i data-lucide="sun"></i>' : '<i data-lucide="moon"></i>';
+        themeBtn.style.color = dark ? 'var(--ambar)' : 'var(--gris-700)';
+        refreshIcons();
+      };
+      updateThemeIcon();
+
+      themeBtn.addEventListener('click', () => {
+        const nowDark = document.body.classList.toggle('dark-mode');
+        try { localStorage.setItem('theme', nowDark ? 'dark' : 'light'); } catch(e){}
+        updateThemeIcon();
+        themeBtn.style.transform = nowDark ? 'rotate(360deg)' : 'rotate(0deg)';
+      });
+    }
+  } catch (e) {
+    console.warn("Modo oscuro desactivado por privacidad del navegador", e);
+  }
 
   if (admin) {
-    top.querySelector('.menu-btn').addEventListener("click", () => {
+    top.querySelector('.menu-btn')?.addEventListener("click", () => {
       shell.classList.add("sidebar-open");
     });
   }
 
-  top.querySelector('[data-action="logout"]').addEventListener("click", () => logout());
+  top.querySelector('[data-action="logout"]')?.addEventListener("click", () => logout());
   main.appendChild(top);
 
   const mainEl = el(`<main class="app-main"></main>`);
-  mainEl.appendChild(viewBody);
+  if (viewBody) mainEl.appendChild(viewBody);
   main.appendChild(mainEl);
-
 
   if (!admin) {
     const nav = el(`

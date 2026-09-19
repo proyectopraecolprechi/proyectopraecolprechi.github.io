@@ -25,41 +25,46 @@ export async function renderCierreAnio({ mount }) {
 
   const grados = (await listGrados({ soloActivos: false })).filter(g => !g.es_virtual);
 
-  $("#cargar", body).addEventListener("click", cargar);
+  $("#cargar", body)?.addEventListener("click", cargar);
   cargar();
 
   async function cargar() {
     const $c =$("#contenido", body);
     loading($c);
-    let propuestaBase = await buildPropuesta();
+    let propuestaBase = await buildPropuesta() || [];
 
     let decisiones = propuestaBase.map(d => {
-      const gradoActual = grados.find(g => g.id === d.estudiante.grado_actual_id);
+      const gradoActual = grados.find(g => g.id === d?.estudiante?.grado_actual_id);
       let orden = gradoActual ? gradoActual.orden : 9999;
       
-      // Inteligencia para ordenar los grados (incluso los fantasmas) por nombre
-      const nom = (d.estudiante.grado_actual_nombre || "").toLowerCase();
+      const nom = (d?.estudiante?.grado_actual_nombre || "").toLowerCase();
       if (nom.includes("jardin") || nom.includes("jardín")) {
-        orden = Math.min(orden, -20); // Fuerza a Jardín a ser el primero absoluto
+        orden = Math.min(orden, -20);
       } else if (nom.includes("transicion") || nom.includes("transición") || nom.match(/^tr/)) {
-        orden = Math.min(orden, -10); // Fuerza a Transición justo después de Jardín
+        orden = Math.min(orden, -10);
       }
 
       return {
-        estudianteId: d.estudiante.id,
-        estudiante: d.estudiante,
-        action: d.action === "promover_manual" ? "manual" : d.action,
-        nuevo_grado_id: d.nuevo_grado_id,
-        nuevo_grado_nombre: d.nuevo_grado_nombre,
+        estudianteId: d?.estudiante?.id,
+        estudiante: d?.estudiante || {},
+        action: d?.action === "promover_manual" ? "manual" : d?.action,
+        nuevo_grado_id: d?.nuevo_grado_id,
+        nuevo_grado_nombre: d?.nuevo_grado_nombre,
         orden_actual: orden
       };
     });
 
-    // Ordenar de menor a mayor grado y luego alfabéticamente
     decisiones.sort((a, b) => {
       if (a.orden_actual !== b.orden_actual) {
         return a.orden_actual - b.orden_actual;
       }
+      
+      const gradoA = (a.estudiante.grado_actual_nombre || "").toLowerCase();
+      const gradoB = (b.estudiante.grado_actual_nombre || "").toLowerCase();
+      if (gradoA !== gradoB) {
+        return gradoA.localeCompare(gradoB);
+      }
+
       const nombreA = `${a.estudiante.apellidos||""} ${a.estudiante.nombres||""}`.toLowerCase();
       const nombreB = `${b.estudiante.apellidos||""} ${b.estudiante.nombres||""}`.toLowerCase();
       return nombreA.localeCompare(nombreB);
@@ -84,7 +89,7 @@ export async function renderCierreAnio({ mount }) {
               ${decisiones.map((d, i) => `
                 <tr>
                   <td>${escapeHtml(d?.estudiante?.apellidos || "")} ${escapeHtml(d?.estudiante?.nombres || "")}</td>
-                  <td>${escapeHtml(d.estudiante.grado_actual_nombre||"")}</td>
+                  <td>${escapeHtml(d?.estudiante?.grado_actual_nombre||"")}</td>
                   <td>
                     <select data-i="${i}" data-field="action">
                       <option value="promover" ${d.action==="promover"?"selected":""}>Promover</option>
@@ -120,18 +125,18 @@ export async function renderCierreAnio({ mount }) {
         render();
       }));
 
-      $c.querySelector('[data-bulk="promover"]').addEventListener("click", () => {
+      $c.querySelector('[data-bulk="promover"]')?.addEventListener("click", () => {
         decisiones = decisiones.map(d => ({ ...d, action: d.action === "egresar" ? "egresar" : "promover" }));
         render();
       });
 
-      $c.querySelector("#aplicar").addEventListener("click", async () => {
+      $c.querySelector("#aplicar")?.addEventListener("click", async () => {
         const invalid = decisiones.find(d => d.action === "promover" && !d.nuevo_grado_id);
         if (invalid) { toast(`Falta asignar grado a ${invalid.estudiante.nombres}`, {type:"error"}); return; }
         const ok = await confirmModal({ title: "Aplicar cierre de año", body: `<p>Se procesarán <strong>${decisiones.length}</strong> estudiantes. Esta acción modifica los grados actuales. ¿Continuar?</p>`, confirmText: "Aplicar" });
         if (!ok) return;
         try {
-          const user = getCurrentUser();
+          const user = getCurrentUser() || { uid: "desconocido" };
           const res = await aplicarCierre({
             anio: Number($("#anio", body).value),
             decisiones: decisiones.map(d => ({ estudianteId: d.estudianteId, action: d.action, nuevo_grado_id: d.nuevo_grado_id, nuevo_grado_nombre: d.nuevo_grado_nombre })),
